@@ -1,4 +1,4 @@
-"""Hibernate Hub engine: localhost dashboard + rule scheduler. Stdlib only."""
+"""Commander Owl engine: localhost dashboard + rule scheduler. Stdlib only."""
 import datetime as dt
 import json
 import os
