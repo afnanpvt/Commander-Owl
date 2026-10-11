@@ -282,7 +282,7 @@ function render(){
     sessions.length?sessions.map(x=>`
       <div class="item ${x.state==='ended'?'off':''}">
         <span class="dot ${x.state}"></span>
-        <div style="min-width:0"><div class="t">${esc(x.conv||x.name)}${armedSid.has(x.id)?'<span class="tag">armed</span>':''}${x.discovered?'<span class="tag" style="color:var(--mute);background:var(--raise)" title="Opened before the hooks existed. Tracked by watching its transcript file; restart it for exact tracking.">watching file</span>':''}</div>
+        <div style="min-width:0"><div class="t">${esc(x.label||x.conv||x.name)}${armedSid.has(x.id)?'<span class="tag">armed</span>':''}${x.discovered?'<span class="tag" style="color:var(--mute);background:var(--raise)" title="Opened before the hooks existed. Tracked by watching its transcript file; restart it for exact tracking.">watching file</span>':''}</div>
           <div class="s">${esc(x.name)} · ${esc(x.last_prompt||x.title||'no prompt seen yet')}</div></div>
         <div style="text-align:right"><div class="m">${x.state} <span data-ago="${x.last_event}"></span></div>
           ${x.state!=='ended'?`<button class="btn sm" style="margin-top:6px" data-act="arm" data-id="${esc(x.id)}">Arm</button>`:''}</div>
@@ -293,7 +293,7 @@ function render(){
   const optSig=JSON.stringify(live.map(x=>[x.id,x.state,x.name]));
   if(sigs.opts!==optSig){
     sigs.opts=optSig;
-    sel.innerHTML=live.length?live.map(x=>`<option value="${esc(x.id)}">${esc(x.conv||x.name)} (${x.state}) · ${esc(x.name)}</option>`).join(''):'<option value="">No live sessions yet</option>';
+    sel.innerHTML=live.length?live.map(x=>`<option value="${esc(x.id)}">${esc(x.label||x.conv||x.name)} (${x.state})</option>`).join(''):'<option value="">No live sessions yet</option>';
     if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
   }
 

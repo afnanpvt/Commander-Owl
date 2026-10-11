@@ -307,6 +307,18 @@ def tick():
 def view():
     t = now()
     sessions = [dict(s, state=session_state(s, t)) for s in S["sessions"].values()]
+    # closed sessions drop off the list after 30 minutes
+    sessions = [s for s in sessions if not (s["state"] == "ended" and t - s["last_event"] > 1800)]
+    # two conversations can share a title; add the folder so they're distinguishable
+    titles = {}
+    for s in sessions:
+        titles.setdefault(s.get("conv") or s["name"], []).append(s)
+    for group in titles.values():
+        if len(group) > 1:
+            for s in group:
+                s["label"] = f"{s.get('conv') or s['name']} ({s['name']})"
+    for s in sessions:
+        s.setdefault("label", s.get("conv") or s["name"])
     sessions.sort(key=lambda s: -s["last_event"])
     return {"now": t, "settings": S["settings"], "sessions": sessions, "rules": S["rules"],
             "pending": S["pending"], "log": S["log"][-60:][::-1], "hibernate_enabled": hibernate_enabled()}
