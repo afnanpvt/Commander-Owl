@@ -6,6 +6,8 @@ import subprocess
 import threading
 import time
 import uuid
+import winsound
+import ctypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -14,9 +16,16 @@ PORT = 47821
 BUSY_STALE = 900   # a "running" session with no hook event or transcript write for this long counts as stalled
 MISSED_AFTER = 120  # a clock rule overdue by more than this (server was down) is skipped, not fired
 NO_WINDOW = 0x08000000
+ES_CONTINUOUS = 0x80000000
+ES_SYSTEM_REQUIRED = 0x00000001
 PROJECTS = os.path.expanduser("~/.claude/projects")
 SCAN_WINDOW = 3 * 3600  # transcripts touched within this long are treated as live sessions
 QUIET = 60              # a transcript-only session with no writes for this long is considered finished
+
+# app -> whether tracking is implemented (only Claude Code hooks and transcripts exist today)
+SOURCES = {"claude-code": True, "codex": False, "other": False}
+
+VERB_NAMES = {"hibernate": "Hibernating", "sleep": "Sleeping", "shutdown": "Shutting down", "lock": "Locking"}
 
 ACTIONS = {
     "hibernate": ["shutdown", "/h"],
@@ -70,14 +79,40 @@ def hibernate_enabled():
 def session_state(s, t):
     if s.get("ended"):
         return "ended"
-    if s["status"] != "running":
-        return "idle"
-    last = s["last_event"]
-    try:
-        last = max(last, os.path.getmtime(s["transcript"]))
-    except (OSError, KeyError, TypeError):
+    return "working" if s.get("activity") == "working" else "idle"
+
+
+def notify(title, text):
+    """Windows balloon plus a system sound. Runs detached so the engine never waits on it."""
+    if not S["settings"].get("notify", True):
+        return
+    winsound.MessageBeep(0x40)  # MB_ICONASTERISK
+    clean = lambda v: str(v).replace("'", "")[:120]
+    script = (
+        "Add-Type -AssemblyName System.Windows.Forms; "
+        "$n=New-Object System.Windows.Forms.NotifyIcon; "
+        "$n.Icon=[System.Drawing.SystemIcons]::Information; $n.Visible=$true; "
+        f"$n.ShowBalloonTip(6000,'{clean(title)}','{clean(text)}',"
+        "[System.Windows.Forms.ToolTipIcon]::Info); "
+        "Start-Sleep -Seconds 7; $n.Dispose()"
+    )
+    subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", script],
+                     creationflags=NO_WINDOW, stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+_awake = None
+
+
+def keep_awake(on):
+    """While any rule is armed, stop Windows from sleeping on its idle timer.
+    Only the rule itself powers the machine off. Lid close and manual sleep still work."""
+    global _awake
+    _awake = on
+    try:  # re-asserted every tick, so a lost or refused request is corrected within a second
+        ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | (ES_SYSTEM_REQUIRED if on else 0))
+    except OSError:
         pass
-    return "working" if t - last < BUSY_STALE else "stalled"
 
 
 # ---------- rule engine (call with LOCK held) ----------
@@ -110,6 +145,8 @@ def fire(rule, reason, session_id=None, cancel_on_activity=True):
     if rule["id"] != "manual":
         consume(rule)
     note(f"Armed {rule['action']} in {rule['grace']}s: {reason}")
+    if rule["grace"] > 0:
+        notify("Commander Owl", f"{VERB_NAMES[rule['action']]} in {rule['grace']}s. Open the dashboard to cancel.")
     if rule["grace"] <= 0:
         threading.Thread(target=execute, daemon=True).start()
 
@@ -143,6 +180,12 @@ def execute():
             with LOCK:
                 note(f"{p['action']} exited {r.returncode}: {(r.stderr or r.stdout).strip()[:160]}")
                 save()
+    except subprocess.TimeoutExpired:
+        # a hibernate or sleep can suspend the machine before the command returns, so a timeout
+        # usually means the action happened, not that it failed
+        with LOCK:
+            note(f"{p['action']} sent; no reply within 30s, the machine most likely went to sleep")
+            save()
     except Exception as e:  # noqa: BLE001
         with LOCK:
             note(f"{p['action']} failed: {e}")
@@ -202,9 +245,70 @@ def label(s):
     return s.get("conv") or s["name"]
 
 
+WRITE_FRESH = 10     # a transcript written this recently is live, whatever its last entry says
+WAIT_LIMIT = 1800   # a turn waiting on a tool call counts as live for this long
+USER_WAIT = 600    # a prompt with no reply counts as live for this long
+
+
+def last_entry(path):
+    """Type and stop reason of the newest user or assistant entry in a transcript."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 200_000))
+            lines = f.read().decode("utf-8", "ignore").splitlines()
+    except OSError:
+        return None, None
+    for line in reversed(lines):
+        try:
+            o = json.loads(line)
+        except ValueError:
+            continue
+        if o.get("type") in ("user", "assistant"):
+            stop = (o.get("message") or {}).get("stop_reason") if o["type"] == "assistant" else None
+            return o["type"], stop
+    return None, None
+
+
+def transcript_active(path, t):
+    """True while a transcript is still mid-turn: writing, waiting on a tool, or waiting on the model.
+    A turn that ended with end_turn is finished, however recently it was written."""
+    try:
+        age = t - os.path.getmtime(path)
+    except OSError:
+        return False
+    if age < WRITE_FRESH:
+        return True
+    if age > WAIT_LIMIT:
+        return False
+    kind, stop = last_entry(path)
+    if kind == "user":  # prompt sent, model has not answered: a long wait here means it was abandoned
+        return age < USER_WAIT
+    if kind == "assistant":
+        if stop == "tool_use":
+            return True
+        return stop is None and age < QUIET
+    return False
+
+
+def session_activity(path, sid, t):
+    """(working, running_subagents). A session is working if its own turn is open or any of its
+    background agents (projects/<dir>/<sid>/subagents/*.jsonl) is still mid-turn."""
+    main = transcript_active(path, t)
+    running = 0
+    try:
+        for f in os.scandir(os.path.join(os.path.dirname(path), sid, "subagents")):
+            if f.name.endswith(".jsonl") and transcript_active(f.path, t):
+                running += 1
+    except OSError:
+        pass
+    return main or running > 0, running
+
+
 def scan():
-    """Find sessions from transcript files, so sessions opened before the hooks existed still show up.
-    Hook-reported sessions stay authoritative; the rest are judged by transcript activity."""
+    """Find sessions that only have a transcript file, then set every live session's activity
+    from its transcript and its subagents. Hook events give identity and closing; transcripts give
+    working vs idle, so an idle main reply with agents still running stays 'working'."""
     t = now()
     try:
         projects = [d.path for d in os.scandir(PROJECTS) if d.is_dir()]
@@ -217,28 +321,35 @@ def scan():
             continue
         for f in files:
             sid, m = f.name[:-6], f.stat().st_mtime
-            if t - m > SCAN_WINDOW or sid in S["dismissed"]:
+            if t - m > SCAN_WINDOW or sid in S["dismissed"] or sid in S["sessions"]:
                 continue
-            s = S["sessions"].get(sid)
-            if s and s.get("_tm") != m:  # transcript changed: refresh the conversation name
-                s["_tm"] = m
-                s["conv"] = peek(f.path)[2] or s.get("conv", "")
-            if s and not s.get("discovered"):
-                continue
-            if not s:
-                cwd, prompt, conv = peek(f.path)
-                cwd = cwd or d
-                s = S["sessions"][sid] = {
-                    "id": sid, "status": "idle", "started": m, "last_event": m, "title": prompt,
-                    "conv": conv, "_tm": m,
-                    "last_prompt": prompt, "cwd": cwd, "ended": False, "discovered": True,
-                    "name": os.path.basename(cwd.rstrip("\\/")) or sid[:8], "transcript": f.path}
-            was, s["last_event"] = s["status"], m
-            s["status"] = "running" if t - m < QUIET else "idle"
-            if was == "idle" and s["status"] == "running":
-                resumed(sid, s)
-            elif was == "running" and s["status"] == "idle":
-                evaluate(sid, "turn")
+            cwd, prompt, conv = peek(f.path)
+            cwd = cwd or d
+            S["sessions"][sid] = {
+                "id": sid, "status": "idle", "started": m, "last_event": m, "title": prompt,
+                "conv": conv, "_tm": m, "last_prompt": prompt, "cwd": cwd, "ended": False,
+                "discovered": True, "name": os.path.basename(cwd.rstrip("\\/")) or sid[:8],
+                "transcript": f.path}
+    for sid, s in list(S["sessions"].items()):
+        path = s.get("transcript")
+        if not path or s.get("ended"):
+            continue
+        try:
+            m = os.path.getmtime(path)
+        except OSError:
+            continue
+        if s.get("_tm") != m:  # transcript changed: refresh the conversation name
+            s["_tm"] = m
+            s["conv"] = peek(path)[2] or s.get("conv", "")
+        s["last_event"] = max(s["last_event"], m)
+        was = s.get("activity", "idle")
+        working, running = session_activity(path, sid, t)
+        s["activity"] = "working" if working else "idle"
+        s["subagents_running"] = running
+        if was == "idle" and s["activity"] == "working":
+            resumed(sid, s)
+        elif was == "working" and s["activity"] == "idle":
+            evaluate(sid, "turn")
 
 
 def on_event(ev):
@@ -259,14 +370,14 @@ def on_event(ev):
         s["transcript"] = ev["transcript_path"]
     if name == "UserPromptSubmit":
         s["status"] = "running"
+        s["activity"] = "working"
         p = (ev.get("prompt") or "").strip().replace("\n", " ")[:140]
-        if p:
+        if p and not p.startswith("<"):  # skip tool and agent wrappers, keep what the user typed
             s["last_prompt"] = p
             s["title"] = s["title"] or p
         resumed(sid, s)
     elif name == "Stop":
-        s["status"] = "idle"
-        evaluate(sid, "turn")
+        s["status"] = "idle"  # finished is decided by the transcript and its subagents, see scan()
     elif name == "SessionEnd":
         s["status"] = "idle"
         s["ended"] = True
@@ -280,6 +391,7 @@ def tick():
         time.sleep(1)
         n += 1
         with LOCK:
+            keep_awake(any(r.get("enabled", True) for r in S["rules"]) or bool(S["pending"]))
             if n % 3 == 1:
                 scan()
             t = now()
@@ -320,7 +432,8 @@ def view():
     for s in sessions:
         s.setdefault("label", s.get("conv") or s["name"])
     sessions.sort(key=lambda s: -s["last_event"])
-    return {"now": t, "settings": S["settings"], "sessions": sessions, "rules": S["rules"],
+    return {"now": t, "settings": {"source": "claude-code", "notify": True, **S["settings"]},
+            "sources": SOURCES, "sessions": sessions, "rules": S["rules"],
             "pending": S["pending"], "log": S["log"][-60:][::-1], "hibernate_enabled": hibernate_enabled()}
 
 
@@ -426,8 +539,18 @@ class Handler(BaseHTTPRequestHandler):
                   "grace": max(0, min(600, int(b.get("grace", 60))))},
                  "started from dashboard", cancel_on_activity=False)
         elif p == "/api/settings":
-            S["settings"]["dry_run"] = bool(b.get("dry_run"))
-            note("Dry run " + ("on" if S["settings"]["dry_run"] else "off"))
+            if "dry_run" in b:
+                S["settings"]["dry_run"] = bool(b["dry_run"])
+                note("Dry run " + ("on" if S["settings"]["dry_run"] else "off"))
+            if "notify" in b:
+                S["settings"]["notify"] = bool(b["notify"])
+            if "source" in b:
+                if b["source"] not in SOURCES:
+                    raise ValueError("Unknown app")
+                if not SOURCES[b["source"]]:
+                    raise ValueError("That app is not supported yet")
+                S["settings"]["source"] = b["source"]
+                note(f"Source app set to {b['source']}")
         elif p == "/api/sessions/clear_ended":
             t = now()
             drop = [k for k, v in S["sessions"].items()

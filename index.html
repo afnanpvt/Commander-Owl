@@ -1,201 +1,321 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Commander Owl</title>
+<meta name="description" content="Sleep your laptop when Claude Code finishes.">
+<link rel="icon" href="branding/commander-owl.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+  /* apply the saved theme before first paint, so there is no flash */
+  (function () {
+    var t = 'system';
+    try { t = localStorage.getItem('hh-theme') || 'system'; } catch (e) {}
+    var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  })();
+</script>
 <style>
 :root{
-  --bg:#0b0c0e; --panel:#111317; --raise:#16181d; --line:#202329; --line2:#2a2e36;
-  --text:#e6e8eb; --mute:#8b919b; --dim:#5a606a;
-  --accent:#5fd4a4; --accent-ink:#06130d; --accent-dim:rgba(95,212,164,.12);
-  --warn:#d9a441;
-  --sans:"Geist","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
-  --mono:"Geist Mono","Cascadia Mono",ui-monospace,Consolas,monospace;
-  --ease:cubic-bezier(.16,1,.3,1);
+  --ink:#1b2430; --ink-2:#4a5566; --ink-3:#8a93a3;
+  --cream:#f4f1ea; --paper:#fbfaf6; --line:#e4dfd3;
+  --amber:#e0a84a; --amber-ink:#5c3d08; --ok:#3f7d5c; --bad:#a4452c;
+  --radius:16px;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --sans:"Geist",ui-sans-serif,system-ui,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+:root[data-theme="dark"]{
+  --ink:#f4f1ea; --ink-2:#c4c9d2; --ink-3:#7e8796;
+  --cream:#141a22; --paper:#1b2430; --line:#2a3442;
+  --amber:#f0bd62; --amber-ink:#2b1c02; --ok:#6fbf93; --bad:#e8866a;
 }
 *{box-sizing:border-box;margin:0}
-html{color-scheme:dark}
-body{background:var(--bg);color:var(--text);font:14px/1.5 var(--sans);min-height:100dvh;-webkit-font-smoothing:antialiased}
+html{color-scheme:light dark}
+body{background:var(--cream);color:var(--ink);font:15px/1.5 var(--sans);min-height:100dvh;-webkit-font-smoothing:antialiased;transition:background .4s var(--ease),color .4s var(--ease)}
 button,input,select{font:inherit;color:inherit}
-.wrap{max-width:1280px;margin:0 auto;padding:0 28px 64px}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px 72px}
 
-/* top bar */
-.bar{display:flex;align-items:center;gap:20px;padding:20px 0;border-bottom:1px solid var(--line)}
-.brand{font-weight:600;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
-.brand i{width:8px;height:8px;border-radius:50%;background:var(--accent);display:block}
+/* header */
+.top{display:flex;align-items:center;gap:14px;padding:22px 0 20px;position:relative}
+.brand{display:flex;align-items:center;gap:12px}
+.owl{width:44px;height:44px;flex:none}
+.brand h1{font-size:19px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.brand p{font-size:12.5px;color:var(--ink-3);margin-top:2px}
 .spacer{flex:1}
-.clock{font:500 13px var(--mono);color:var(--mute)}
-.pill{font:12px var(--mono);color:var(--mute);border:1px solid var(--line2);border-radius:99px;padding:3px 10px;display:inline-flex;gap:7px;align-items:center;white-space:nowrap}
-.pill b{width:6px;height:6px;border-radius:50%;background:var(--dim)}
-.pill.ok b{background:var(--accent)} .pill.bad{color:var(--warn);border-color:rgba(217,164,65,.4)} .pill.bad b{background:var(--warn)}
-.switch{display:inline-flex;gap:8px;align-items:center;cursor:pointer;font:12px var(--mono);color:var(--mute);user-select:none}
-.switch span{width:30px;height:17px;border-radius:99px;background:var(--line2);position:relative;transition:background .25s var(--ease)}
-.switch span::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--text);transition:transform .25s var(--ease)}
-.switch input{display:none}
-.switch input:checked+span{background:var(--warn)} .switch input:checked+span::after{transform:translateX(13px)}
-.banner{display:none;margin-top:14px;font:12px var(--mono);color:var(--warn);border:1px solid rgba(217,164,65,.35);border-radius:8px;padding:8px 12px}
+.status{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.chip{font:500 12px var(--mono);color:var(--ink-2);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:5px 11px;display:inline-flex;gap:7px;align-items:center;white-space:nowrap}
+.chip i{width:7px;height:7px;border-radius:50%;background:var(--ink-3);display:block}
+.chip.ok i{background:var(--ok)}
+.chip.warn{color:var(--amber-ink);background:color-mix(in srgb,var(--amber) 22%,var(--paper));border-color:color-mix(in srgb,var(--amber) 50%,transparent)}
+.chip.warn i{background:var(--amber)}
+.icon-btn{width:36px;height:36px;border-radius:11px;border:1px solid var(--line);background:var(--paper);display:grid;place-items:center;cursor:pointer;transition:transform .15s var(--ease),border-color .2s}
+.icon-btn:hover{border-color:var(--ink-3)}
+.icon-btn:active{transform:scale(.95)}
+.icon-btn svg{width:18px;height:18px;stroke:var(--ink-2);fill:none;stroke-width:1.8;stroke-linecap:round}
+.toggle{display:inline-flex;gap:9px;align-items:center;cursor:pointer;font-size:13px;color:var(--ink-2);user-select:none}
+.toggle input{position:absolute;opacity:0;width:0;height:0}
+.toggle .track{width:34px;height:20px;border-radius:999px;background:var(--line);position:relative;transition:background .3s var(--ease);flex:none}
+.toggle .track::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--paper);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .3s var(--ease)}
+.toggle input:checked + .track{background:var(--amber)}
+.toggle input:checked + .track::after{transform:translateX(14px)}
+.toggle input:focus-visible + .track{outline:2px solid var(--ink);outline-offset:2px}
+.banner{display:none;margin:0 0 18px;font-size:13px;color:var(--amber-ink);background:color-mix(in srgb,var(--amber) 20%,var(--paper));border:1px solid color-mix(in srgb,var(--amber) 45%,transparent);border-radius:12px;padding:10px 14px}
 .banner.on{display:block}
 
+/* settings */
+.pop{position:absolute;top:calc(100% - 6px);right:24px;width:min(360px,calc(100vw - 32px));z-index:30;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:0 18px 44px rgba(0,0,0,.14);transform-origin:top right;animation:pop .3s var(--ease) both}
+@keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.98)}}
+.pop h4{font-size:12px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px}
+.pop .group+.group{margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}
+.pop .row-s{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;cursor:pointer}
+.pop .row-s small{display:block;color:var(--ink-3);font-size:12.5px;margin-top:2px}
+
 /* layout */
-.grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:56px;margin-top:36px}
-@media (max-width:900px){.grid{grid-template-columns:1fr;gap:40px}.wrap{padding:0 16px 48px}.bar{flex-wrap:wrap;gap:12px}}
-h2{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px}
-h2 .n{color:var(--mute)} h2 a{margin-left:auto;text-transform:none;letter-spacing:0;color:var(--mute);cursor:pointer;font-size:12px} h2 a:hover{color:var(--text)}
-section+section{margin-top:44px}
+.grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:1fr}.wrap{padding:0 16px 56px}}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:22px;transition:background .4s var(--ease),border-color .4s var(--ease)}
+.card+.card{margin-top:24px}
+.card h2{font-size:13px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card h2 .hint{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;font-size:12.5px;color:var(--ink-2);cursor:pointer;background:none;border:0;padding:2px 6px;border-radius:6px}
+.card h2 .hint:hover{color:var(--ink);background:var(--cream)}
 
 /* hero */
-.hero{display:grid;grid-template-columns:1fr auto;gap:32px;align-items:center;min-height:250px}
-@media (max-width:560px){.hero{grid-template-columns:1fr}}
-.hero h1{font:600 38px/1.05 var(--sans);letter-spacing:-.035em}
-.hero p{color:var(--mute);margin-top:12px;max-width:46ch}
-.hero .why{color:var(--text)}
-.acts{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
-.ring{position:relative;width:220px;height:220px}
+.hero{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center}
+@media (max-width:520px){.hero{grid-template-columns:1fr;justify-items:center;text-align:center}}
+.hero .owl-big{width:132px;height:132px}
+.hero h3{font-size:24px;font-weight:600;letter-spacing:-.025em;line-height:1.15}
+.hero p{color:var(--ink-2);margin-top:8px;font-size:14.5px}
+.hero .sub strong{color:var(--ink);font-weight:600}
+.acts{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.countdown{display:none;align-items:center;gap:16px;margin-top:4px}
+.countdown.on{display:flex}
+.ring{position:relative;width:76px;height:76px;flex:none}
 .ring svg{transform:rotate(-90deg);display:block}
-.ring circle{fill:none;stroke-width:3}
-.ring .track{stroke:var(--line2)}
-.ring .prog{stroke:var(--accent);stroke-linecap:round;stroke-dasharray:603.2;stroke-dashoffset:603.2;transition:stroke-dashoffset 1s linear}
-.ring .mid{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
-.ring .num{font:500 60px/1 var(--mono);letter-spacing:-.04em}
-.ring .lbl{font:12px var(--mono);color:var(--mute);margin-top:6px}
-.ring.idle .prog{opacity:0}
-.ring.idle .track{animation:breathe 4.5s ease-in-out infinite}
-@keyframes breathe{50%{stroke:var(--line);opacity:.5}}
-.ring.idle .num{font-size:15px;color:var(--mute);letter-spacing:0}
+.ring circle{fill:none;stroke-width:5}
+.ring .track-c{stroke:var(--line)}
+.ring .prog{stroke:var(--amber);stroke-linecap:round;transition:stroke-dashoffset 1s linear}
+.ring .num{position:absolute;inset:0;display:grid;place-content:center;font:600 22px var(--mono);letter-spacing:-.02em}
 
-/* controls */
-.btn{border:1px solid var(--line2);background:var(--raise);border-radius:8px;padding:8px 14px;cursor:pointer;transition:transform .15s var(--ease),border-color .2s,background .2s}
-.btn:hover{border-color:var(--dim)} .btn:active{transform:translateY(1px) scale(.98)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
-.btn.primary:hover{background:#78e0b6}
-.btn.sm{padding:4px 10px;font-size:12px}
-.btn:focus-visible,.seg button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.seg{display:inline-flex;border:1px solid var(--line2);border-radius:9px;padding:3px;gap:2px;flex-wrap:wrap;background:var(--panel)}
-.seg button{border:0;background:none;border-radius:6px;padding:5px 12px;cursor:pointer;color:var(--mute);transition:background .2s,color .2s}
-.seg button:hover{color:var(--text)}
-.seg button.on{background:var(--raise);color:var(--text);box-shadow:inset 0 0 0 1px var(--line2)}
-.seg.tabs button.on{color:var(--accent)}
-label.f{display:block;margin-top:18px}
-label.f>span,.f>.l{display:block;font-size:12px;color:var(--mute);margin-bottom:7px}
-.field{width:100%;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:8px 10px}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--paper);border-radius:11px;padding:9px 15px;cursor:pointer;font-weight:500;font-size:14px;transition:transform .15s var(--ease),border-color .2s}
+.btn:hover{border-color:var(--ink-3)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--ink);color:var(--cream);border-color:var(--ink)}
+.btn.primary:hover{opacity:.9}
+.btn.amber{background:var(--amber);border-color:var(--amber);color:var(--amber-ink)}
+.btn.sm{padding:5px 10px;font-size:12.5px;border-radius:9px}
+
+/* segmented + fields */
+.seg{display:inline-flex;background:var(--cream);border:1px solid var(--line);border-radius:12px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:none;border-radius:9px;padding:6px 12px;cursor:pointer;color:var(--ink-2);font-size:13.5px;transition:background .25s var(--ease),color .25s}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--paper);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08),inset 0 0 0 1px var(--line)}
+.field-label{display:block;font-size:13px;color:var(--ink-2);margin:18px 0 7px;font-weight:500}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>*{flex:1;min-width:0}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.chips button{font:12px var(--mono)}
-.err{color:var(--warn);font-size:12px;margin-top:10px;min-height:18px}
-.help{color:var(--dim);font-size:12px;margin-top:6px}
+.err{color:var(--bad);font-size:13px;margin-top:12px;min-height:18px}
+.help{color:var(--ink-3);font-size:12.5px;margin-top:7px}
+input[type=number],input[type=time]{width:100%;background:var(--cream);border:1px solid var(--line);border-radius:11px;padding:9px 11px;font-size:14px}
+
+/* custom dropdown */
+.dd{position:relative;width:100%}
+.dd-btn{width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--cream);border:1px solid var(--line);border-radius:11px;padding:9px 12px;font-size:14px;cursor:pointer;transition:border-color .2s}
+.dd-btn:hover{border-color:var(--ink-3)}
+.dd-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dd-btn::after{content:"";width:7px;height:7px;flex:none;border-right:1.5px solid var(--ink-3);border-bottom:1.5px solid var(--ink-3);transform:translateY(-2px) rotate(45deg);transition:transform .25s var(--ease)}
+.dd.open .dd-btn::after{transform:translateY(1px) rotate(225deg)}
+.dd-list{position:absolute;z-index:40;left:0;right:0;top:calc(100% + 6px);background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px rgba(0,0,0,.14);padding:5px;list-style:none;opacity:0;transform:translateY(-4px) scale(.98);transform-origin:top;pointer-events:none;transition:opacity .18s var(--ease),transform .18s var(--ease);max-height:260px;overflow:auto}
+.dd.open .dd-list{opacity:1;transform:none;pointer-events:auto}
+.dd-list li{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.dd-list li:hover,.dd-list li:focus{background:var(--cream);outline:none}
+.dd-list li[aria-selected=true]{font-weight:600}
+.dd-list li[aria-selected=true]::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--amber);flex:none}
+.dd-list li[aria-disabled=true]{color:var(--ink-3);cursor:default}
+.dd-list li[aria-disabled=true]:hover{background:none}
+.soon{font:500 11px var(--mono);color:var(--ink-3);white-space:nowrap}
 
 /* lists */
-.list{border-top:1px solid var(--line)}
-.item{display:grid;grid-template-columns:14px 1fr auto;gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line);animation:in .4s var(--ease) both}
-@keyframes in{from{opacity:0;transform:translateY(4px)}}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--dim);justify-self:center}
-.dot.working{background:var(--accent);animation:pulse 1.6s ease-in-out infinite}
-.dot.idle{background:var(--mute)} .dot.ended{background:none;border:1px solid var(--dim)} .dot.stalled{background:none;border:1px solid var(--warn)}
-@keyframes pulse{50%{opacity:.3;transform:scale(.75)}}
-.item .t{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.item .s{color:var(--mute);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
-.item .m{font:12px var(--mono);color:var(--dim)}
-.tag{font:11px var(--mono);color:var(--accent);background:var(--accent-dim);border-radius:5px;padding:1px 6px;margin-left:8px;vertical-align:1px}
-.off{opacity:.45}
-.empty{padding:22px 0;color:var(--mute);border-bottom:1px solid var(--line);max-width:52ch}
-.empty b{color:var(--text);font-weight:500}
-.log{font:12px/1.9 var(--mono);color:var(--mute);max-height:260px;overflow:auto}
-.log div{display:grid;grid-template-columns:64px 1fr;gap:12px}
-.log time{color:var(--dim)}
-.mono{font-family:var(--mono)}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.list{display:flex;flex-direction:column}
+.item{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:14px;align-items:center;padding:13px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0;padding-top:2px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--ink-3);justify-self:center;transition:background .4s var(--ease)}
+.dot.working{background:var(--ok);animation:ping 2s var(--ease) infinite}
+.dot.idle{background:var(--ink-3)}
+.dot.ended{background:none;box-shadow:inset 0 0 0 1.5px var(--ink-3);opacity:.6}
+@keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 45%,transparent)}70%,100%{box-shadow:0 0 0 7px transparent}}
+.t{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.s{color:var(--ink-3);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.meta{font:12px var(--mono);color:var(--ink-3);text-align:right;white-space:nowrap}
+.meta .state{display:block;color:var(--ink-2);text-transform:capitalize;margin-bottom:6px}
+.tag{font:500 11px var(--mono);color:var(--ink-2);background:var(--cream);border:1px solid var(--line);border-radius:6px;padding:1px 7px;margin-left:8px;vertical-align:1px;white-space:nowrap}
+.tag.amber{color:var(--amber-ink);background:color-mix(in srgb,var(--amber) 22%,var(--paper));border-color:transparent}
+.item.off{opacity:.5}
+.empty{padding:6px 0 2px;color:var(--ink-2);font-size:14px}
+.empty b{display:block;color:var(--ink);font-weight:600;margin-bottom:4px}
+.log{font:12.5px/1.8 var(--mono);color:var(--ink-2);max-height:260px;overflow:auto}
+.log div{display:grid;grid-template-columns:70px 1fr;gap:12px}
+.log time{color:var(--ink-3)}
+.fade{animation:fadeIn .45s var(--ease) both}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}}
+
+/* mascot: 3D always on; the flat owl only shows if WebGL is unavailable */
+.stage{width:156px;height:156px;position:relative;flex:none}
+.stage canvas{width:156px!important;height:156px!important;display:block}
+.stage.has3d .owl-big{display:none}
+/* mascot (2D fallback, state-driven) */
+.owl .ink{fill:var(--ink)}
+.owl .cream{fill:var(--cream)}
+.owl .stroke{fill:none;stroke:var(--cream);stroke-width:9;stroke-linecap:round;stroke-linejoin:round}
+.owl .body,.owl .eyes{transform-box:fill-box;transform-origin:center}
+.owl.idle .body{animation:bob 5s ease-in-out infinite}
+.owl.idle .eyes{animation:blink 6s infinite}
+.owl.working .body{animation:bob 2.4s ease-in-out infinite}
+.owl.alert .body{animation:shake .5s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-3px)}}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header class="bar">
-    <div class="brand"><i></i>Commander Owl</div>
+  <header class="top">
+    <div class="brand">
+      <svg class="owl" id="brandOwl" viewBox="0 0 256 256" role="img" aria-label="Commander Owl"></svg>
+      <div>
+        <h1>Commander Owl</h1>
+        <p>Sleep your laptop when Claude is done</p>
+      </div>
+    </div>
     <div class="spacer"></div>
-    <span class="pill" id="pEngine"><b></b>engine</span>
-    <span class="pill" id="pHib"><b></b>hibernate</span>
-    <label class="switch" title="Log what would happen without powering anything off"><input type="checkbox" id="dry"><span></span>dry run</label>
-    <div class="clock" id="clock"></div>
+    <div class="status">
+      <span class="chip" id="pEngine"><i></i><span>engine</span></span>
+      <span class="chip" id="pHib"><i></i><span>hibernate</span></span>
+      <label class="toggle" title="Log what would happen without powering anything off"><input type="checkbox" id="dry"><span class="track"></span>Dry run</label>
+      <button class="icon-btn" id="gear" aria-label="Settings" aria-expanded="false" aria-controls="settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+
+    <section class="pop" id="settings" role="dialog" aria-label="Settings" hidden>
+      <div class="group">
+        <h4>Appearance</h4>
+        <div class="seg" id="theme">
+          <button data-v="system">System</button>
+          <button data-v="light">Light</button>
+          <button data-v="dark">Dark</button>
+        </div>
+      </div>
+      <div class="group">
+        <h4>Claude app</h4>
+        <div class="dd" id="ddSource"></div>
+        <p class="help" id="srcHelp"></p>
+      </div>
+      <div class="group">
+        <label class="row-s">
+          <span>Notifications<small>A Windows notification and sound when a countdown starts</small></span>
+          <span class="toggle"><input type="checkbox" id="notify"><span class="track"></span></span>
+        </label>
+      </div>
+    </section>
   </header>
-  <div class="banner" id="banner">Dry run is on. Rules will count down and log, but nothing will power off.</div>
+
+  <div class="banner" id="banner" role="status">Dry run is on. Rules count down and log, but nothing powers off.</div>
 
   <main class="grid">
     <div>
-      <section class="hero">
-        <div>
-          <h1 id="hTitle">Standing by</h1>
-          <p id="hSub"></p>
-          <div class="acts" id="hActs"></div>
-        </div>
-        <div class="ring idle" id="ring">
-          <svg width="220" height="220" viewBox="0 0 220 220"><circle class="track" cx="110" cy="110" r="96"/><circle class="prog" id="prog" cx="110" cy="110" r="96"/></svg>
-          <div class="mid"><div class="num" id="rNum">idle</div><div class="lbl" id="rLbl"></div></div>
+      <section class="card">
+        <div class="hero">
+          <div class="stage" id="stage"><svg class="owl owl-big" id="heroOwl" viewBox="0 0 256 256" role="img" aria-label="Commander Owl status"></svg></div>
+          <div>
+            <h3 id="hTitle">Standing by</h3>
+            <p class="sub" id="hSub"></p>
+            <div class="countdown" id="cd">
+              <div class="ring">
+                <svg width="76" height="76" viewBox="0 0 76 76"><circle class="track-c" cx="38" cy="38" r="32"/><circle class="prog" id="prog" cx="38" cy="38" r="32" stroke-dasharray="201.06" stroke-dashoffset="0"/></svg>
+                <div class="num" id="rNum">0</div>
+              </div>
+              <div>
+                <div style="font-weight:600" id="cdAction"></div>
+                <div class="help" id="cdReason"></div>
+              </div>
+            </div>
+            <div class="acts" id="hActs"></div>
+          </div>
         </div>
       </section>
 
-      <section>
-        <h2>Claude sessions <a id="clearEnded">clear ended</a></h2>
+      <section class="card">
+        <h2>Claude sessions <button class="hint" id="clearEnded" title="Hide sessions that have closed">Hide closed</button></h2>
         <div class="list" id="sessions"></div>
       </section>
 
-      <section>
+      <section class="card">
         <h2>Activity</h2>
         <div class="log" id="log"></div>
       </section>
     </div>
 
     <aside>
-      <section id="composer">
+      <section class="card" id="composer">
         <h2>Arm a rule</h2>
-        <div class="seg tabs" id="kind">
-          <button data-v="session" class="on">Session</button>
-          <button data-v="idle">All idle</button>
-          <button data-v="clock">Clock</button>
-          <button data-v="timer">Timer</button>
-        </div>
 
-        <div class="f" style="margin-top:18px"><span class="l">Then</span>
-          <div class="seg" id="action">
-            <button data-v="hibernate" class="on">Hibernate</button>
-            <button data-v="sleep">Sleep</button>
-            <button data-v="shutdown">Shut down</button>
-            <button data-v="lock">Lock</button>
-          </div>
+        <span class="field-label" style="margin-top:0">When</span>
+        <div class="seg" id="kind">
+          <button data-v="session" class="on">A session</button>
+          <button data-v="idle">All idle</button>
+          <button data-v="clock">A time</button>
+          <button data-v="timer">A timer</button>
         </div>
 
         <div data-for="session">
-          <label class="f"><span>Which session</span><select class="field" id="sess"></select></label>
-          <div class="f"><span class="l">When</span>
-            <div class="seg" id="trigger">
-              <button data-v="turn" class="on">It finishes this run</button>
-              <button data-v="end">The session closes</button>
-            </div>
+          <span class="field-label">Which session</span>
+          <div class="dd" id="ddSess"></div>
+          <span class="field-label">Trigger</span>
+          <div class="seg" id="trigger">
+            <button data-v="turn" class="on">It finishes</button>
+            <button data-v="end">It closes</button>
           </div>
         </div>
-        <div data-for="idle" hidden><p class="help" style="margin-top:18px">Fires the next time a run finishes and no tracked session is still working. Good for several sessions at once.</p></div>
+        <p class="help" data-for="idle" hidden>Fires when a run finishes and no tracked session is still working.</p>
         <div data-for="clock" hidden>
           <div class="row">
-            <label class="f" style="flex:1"><span>Time (24h)</span><input class="field" type="time" id="time" value="23:30"></label>
-            <label class="f" style="flex:1"><span>Repeat</span>
-              <select class="field" id="repeat"><option value="once">Once</option><option value="daily">Every day</option><option value="weekdays">Weekdays</option></select></label>
+            <label style="flex:1"><span class="field-label">Time</span><input type="time" id="time" value="23:30"></label>
+            <div style="flex:1"><span class="field-label">Repeat</span><div class="dd" id="ddRepeat"></div></div>
           </div>
-          <p class="help">Uses the next time this clock reads that value.</p>
         </div>
         <div data-for="timer" hidden>
-          <label class="f"><span>In how many minutes</span><input class="field mono" type="number" id="mins" min="1" max="1440" value="30"></label>
+          <label for="mins"><span class="field-label">Minutes from now</span></label>
+          <input type="number" id="mins" min="1" max="1440" value="30">
           <div class="chips" id="chips"></div>
         </div>
 
-        <label class="f"><span>Warning countdown, cancel any time</span>
-          <select class="field" id="grace"><option value="0">None, act immediately</option><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="60" selected>60 seconds</option><option value="120">2 minutes</option><option value="300">5 minutes</option></select></label>
+        <span class="field-label">Then</span>
+        <div class="seg" id="action">
+          <button data-v="hibernate" class="on">Hibernate</button>
+          <button data-v="sleep">Sleep</button>
+          <button data-v="shutdown">Shut down</button>
+          <button data-v="lock">Lock</button>
+        </div>
 
-        <div class="row" style="margin-top:20px"><button class="btn primary" id="arm">Arm rule</button><button class="btn" id="runNow">Run now</button></div>
+        <span class="field-label">Warning before it happens</span>
+        <div class="dd" id="ddGrace"></div>
+
+        <div class="row" style="margin-top:20px">
+          <button class="btn primary" id="arm">Arm rule</button>
+          <button class="btn" id="runNow">Run now</button>
+        </div>
         <div class="err" id="err" role="alert"></div>
       </section>
 
-      <section>
+      <section class="card">
         <h2>Armed rules</h2>
         <div class="list" id="rules"></div>
       </section>
@@ -203,152 +323,433 @@ label.f>span,.f>.l{display:block;font-size:12px;color:var(--mute);margin-bottom:
   </main>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu" crossorigin="anonymous"></script>
 <script>
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const H={'X-HHUB':'1','Content-Type':'application/json'};
-const VERB={hibernate:'Hibernate',sleep:'Sleep',shutdown:'Shut down',lock:'Lock'};
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let ST=null, off=0, sigs={}, form={kind:'session',action:'hibernate',trigger:'turn'};
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const H = {'X-HHUB': '1', 'Content-Type': 'application/json'};
+const VERB = {hibernate: 'Hibernate', sleep: 'Sleep', shutdown: 'Shut down', lock: 'Lock'};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const RING = 2 * Math.PI * 32;
 
-async function api(path,body){
-  const r=await fetch(path,body===undefined?{}:{method:'POST',headers:H,body:JSON.stringify(body)});
-  const j=await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(j.error||r.statusText);
-  return j;
+/* theme (per-viewer, stored in this browser) */
+function applyTheme(mode) {
+  const dark = mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  $$('#theme button').forEach(b => b.classList.toggle('on', b.dataset.v === mode));
+  owl.recolor(dark);
 }
-const nowS=()=>Date.now()/1000+off;
-const dur=s=>{s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?`${h}h ${String(m).padStart(2,'0')}m`:m?`${m}m ${String(s%60).padStart(2,'0')}s`:`${s}s`};
-const ago=s=>{s=Math.max(0,nowS()-s);return s<10?'just now':dur(s)+' ago'};
-const clk=ts=>new Date(ts*1000).toLocaleString([],{weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false});
-const hms=ts=>new Date(ts*1000).toLocaleTimeString([],{hour12:false});
+const themeMode = () => { try { return localStorage.getItem('hh-theme') || 'system'; } catch (e) { return 'system'; } };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themeMode() === 'system') applyTheme('system'); });
+$('#theme').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  try { localStorage.setItem('hh-theme', b.dataset.v); } catch (e) {}
+  applyTheme(b.dataset.v);
+});
 
-/* segmented controls */
-function seg(id,key,cb){
-  $(id).addEventListener('click',e=>{
-    const b=e.target.closest('button'); if(!b) return;
-    $$(id+' button').forEach(x=>x.classList.toggle('on',x===b));
-    form[key]=b.dataset.v; cb&&cb();
+/* custom dropdown */
+class Dropdown {
+  constructor(host, onChange) {
+    this.host = host; this.onChange = onChange; this.opts = []; this.value = null;
+    this.btn = document.createElement('button');
+    this.btn.type = 'button'; this.btn.className = 'dd-btn'; this.btn.setAttribute('aria-haspopup', 'listbox');
+    this.list = document.createElement('ul');
+    this.list.className = 'dd-list'; this.list.setAttribute('role', 'listbox');
+    host.append(this.btn, this.list);
+    this.btn.addEventListener('click', () => this.toggle());
+    this.btn.addEventListener('keydown', e => { if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); this.open(); } });
+    this.list.addEventListener('keydown', e => this.keys(e));
+    this.list.addEventListener('click', e => {
+      const li = e.target.closest('li'); if (li && li.getAttribute('aria-disabled') !== 'true') this.pick(li.dataset.v);
+    });
+    document.addEventListener('click', e => { if (!host.contains(e.target)) this.close(); });
+  }
+  set(opts, value) {
+    this.opts = opts;
+    this.list.innerHTML = opts.map(o => `<li role="option" tabindex="-1" data-v="${esc(o.value)}" aria-disabled="${!!o.disabled}" aria-selected="false"><span>${esc(o.label)}</span>${o.note ? `<em class="soon">${esc(o.note)}</em>` : ''}</li>`).join('');
+    const keep = value !== undefined ? value : this.value;
+    this.select(this.opts.some(o => o.value === keep) ? keep : (this.opts[0] ? this.opts[0].value : null), false);
+  }
+  select(v, emit = true) {
+    this.value = v;
+    const o = this.opts.find(x => x.value === v);
+    this.btn.innerHTML = `<span>${esc(o ? o.label : 'Nothing to pick')}</span>`;
+    this.btn.disabled = !this.opts.length;
+    $$('li', this.list).forEach(li => li.setAttribute('aria-selected', String(li.dataset.v === v)));
+    if (emit && this.onChange) this.onChange(v);
+  }
+  pick(v) { this.select(v); this.close(); this.btn.focus(); }
+  open() { this.host.classList.add('open'); this.btn.setAttribute('aria-expanded', 'true');
+    const cur = this.list.querySelector('[aria-selected=true]') || this.list.querySelector('li:not([aria-disabled=true])');
+    cur && cur.focus(); }
+  close() { this.host.classList.remove('open'); this.btn.setAttribute('aria-expanded', 'false'); }
+  toggle() { this.host.classList.contains('open') ? this.close() : this.open(); }
+  keys(e) {
+    const items = $$('li:not([aria-disabled=true])', this.list);
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); items[Math.min(i + 1, items.length - 1)]?.focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); items[Math.max(i - 1, 0)]?.focus(); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (i >= 0) this.pick(items[i].dataset.v); }
+    else if (e.key === 'Escape') { this.close(); this.btn.focus(); }
+  }
+}
+const ddSess = new Dropdown($('#ddSess'), v => { form.session = v; });
+const ddGrace = new Dropdown($('#ddGrace'), v => { form.grace = +v; });
+const ddRepeat = new Dropdown($('#ddRepeat'), v => { form.repeat = v; });
+const ddSource = new Dropdown($('#ddSource'), v => { if (ST && ST.sources[v]) act('/api/settings', {source: v}); });
+ddGrace.set([{value: 0, label: 'None, act now'}, {value: 15, label: '15 seconds'}, {value: 30, label: '30 seconds'},
+  {value: 60, label: '1 minute'}, {value: 120, label: '2 minutes'}, {value: 300, label: '5 minutes'}], 60);
+ddRepeat.set([{value: 'once', label: 'Once'}, {value: 'daily', label: 'Every day'}, {value: 'weekdays', label: 'Weekdays'}], 'once');
+ddSource.set([{value: 'claude-code', label: 'Claude Code'},
+  {value: 'codex', label: 'Codex', disabled: true, note: 'soon'},
+  {value: 'other', label: 'Another app', disabled: true, note: 'soon'}], 'claude-code');
+
+/* form state */
+let ST = null, off = 0, sigs = {};
+let form = {kind: 'session', action: 'hibernate', trigger: 'turn', session: null, grace: 60, repeat: 'once'};
+function seg(id, key, cb) {
+  $(id).addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $$(id + ' button').forEach(x => x.classList.toggle('on', x === b));
+    form[key] = b.dataset.v; cb && cb();
   });
 }
-const applyKind=()=>$$('[data-for]').forEach(el=>el.hidden=el.dataset.for!==form.kind);
-seg('#kind','kind',applyKind); seg('#action','action'); seg('#trigger','trigger');
-[15,30,45,60,90,120].forEach(m=>{
-  const b=document.createElement('button'); b.className='btn sm'; b.textContent=m+' min';
-  b.onclick=()=>$('#mins').value=m; $('#chips').append(b);
+const applyKind = () => $$('[data-for]').forEach(el => el.hidden = el.dataset.for !== form.kind);
+seg('#kind', 'kind', applyKind); seg('#action', 'action'); seg('#trigger', 'trigger');
+[15, 30, 45, 60, 90, 120].forEach(m => {
+  const b = document.createElement('button'); b.className = 'btn sm'; b.type = 'button';
+  b.textContent = m + ' min'; b.onclick = () => $('#mins').value = m; $('#chips').append(b);
 });
 
-async function post(path,body){ try{ await api(path,body); await poll(); }catch(e){ $('#err').textContent=e.message; } }
-
-$('#arm').onclick=async()=>{
-  $('#err').textContent='';
-  const b={action:form.action,grace:+$('#grace').value};
-  if(form.kind==='session'){ b.kind='session'; b.session_id=$('#sess').value; b.trigger=form.trigger; }
-  else if(form.kind==='idle') b.kind='idle';
-  else{ b.kind='time'; if(form.kind==='timer') b.minutes=+$('#mins').value; else{ b.time=$('#time').value; b.repeat=$('#repeat').value; } }
-  await post('/api/rules',b);
+/* actions */
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {method: 'POST', headers: H, body: JSON.stringify(body)});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+async function act(path, body) {
+  $('#err').textContent = '';
+  try { await api(path, body); await poll(); }
+  catch (e) { $('#err').textContent = e.message; poll(); }
+}
+$('#arm').onclick = () => {
+  const b = {action: form.action, grace: form.grace};
+  if (form.kind === 'session') { b.kind = 'session'; b.session_id = form.session; b.trigger = form.trigger; }
+  else if (form.kind === 'idle') b.kind = 'idle';
+  else {
+    b.kind = 'time';
+    if (form.kind === 'timer') b.minutes = +$('#mins').value;
+    else { b.time = $('#time').value; b.repeat = form.repeat; }
+  }
+  act('/api/rules', b);
 };
-$('#runNow').onclick=()=>post('/api/fire_now',{action:form.action,grace:+$('#grace').value});
-$('#dry').onchange=e=>post('/api/settings',{dry_run:e.target.checked});
-$('#clearEnded').onclick=()=>post('/api/sessions/clear_ended',{});
-document.addEventListener('click',e=>{
-  const a=e.target.closest('[data-act]'); if(!a) return;
-  const id=a.dataset.id;
-  if(a.dataset.act==='cancel') post('/api/cancel',{});
-  if(a.dataset.act==='del') post('/api/rules/delete',{id});
-  if(a.dataset.act==='tog') post('/api/rules/toggle',{id});
-  if(a.dataset.act==='arm'){
-    $('#kind [data-v=session]').click(); $('#sess').value=id;
-    $('#composer').scrollIntoView({behavior:'smooth',block:'start'}); $('#arm').focus({preventScroll:true});
+$('#runNow').onclick = () => act('/api/fire_now', {action: form.action, grace: form.grace});
+$('#dry').onchange = e => act('/api/settings', {dry_run: e.target.checked});
+$('#notify').onchange = e => act('/api/settings', {notify: e.target.checked});
+$('#clearEnded').onclick = () => act('/api/sessions/clear_ended', {});
+$('#gear').onclick = () => {
+  const p = $('#settings'); const open = p.hidden;
+  p.hidden = !open; $('#gear').setAttribute('aria-expanded', String(open));
+};
+function closeSettings() { $('#settings').hidden = true; $('#gear').setAttribute('aria-expanded', 'false'); }
+document.addEventListener('click', e => {
+  if (!$('#settings').hidden && !e.target.closest('#settings, #gear')) closeSettings();
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const id = a.dataset.id;
+  if (a.dataset.act === 'cancel') act('/api/cancel', {});
+  if (a.dataset.act === 'del') act('/api/rules/delete', {id});
+  if (a.dataset.act === 'tog') act('/api/rules/toggle', {id});
+  if (a.dataset.act === 'arm') {
+    $('#kind [data-v=session]').click(); ddSess.select(id, false); form.session = id;
+    $('#composer').scrollIntoView({behavior: 'smooth', block: 'start'});
   }
 });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#settings').hidden) { closeSettings(); $('#gear').focus(); } });
 
-/* render helpers: only touch the DOM when the data changed */
-function put(id,sig,html){ if(sigs[id]!==sig){ sigs[id]=sig; $(id).innerHTML=html; } }
-const ruleText=r=>{
-  const A=VERB[r.action];
-  if(r.kind==='session'){ const x=ST.sessions.find(z=>z.id===r.session_id); return `${A} when <b>${esc(x?(x.conv||x.name):r.session_name)}</b> ${r.trigger==='end'?'closes':'finishes its run'}`; }
-  if(r.kind==='idle') return `${A} when every session is idle`;
-  return `${A} at <b class="mono">${clk(r.at_ts)}</b>${r.repeat==='daily'?', every day':r.repeat==='weekdays'?', weekdays':''}`;
+/* rendering: re-render a list only when its data changed */
+function put(id, sig, html) { if (sigs[id] !== sig) { sigs[id] = sig; $(id).innerHTML = html; } }
+const nowS = () => Date.now() / 1000 + off;
+const ago = ts => { const s = nowS() - ts; return s < 15 ? 'just now' : s < 3600 ? Math.floor(s / 60) + 'm ago' : Math.floor(s / 3600) + 'h ago'; };
+const hms = ts => new Date(ts * 1000).toLocaleTimeString([], {hour12: false});
+const when = ts => new Date(ts * 1000).toLocaleString([], {weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false});
+const ruleText = r => {
+  const A = VERB[r.action];
+  if (r.kind === 'session') {
+    const x = ST.sessions.find(z => z.id === r.session_id);
+    return `${A} when <strong>${esc(x ? x.label : r.session_name)}</strong> ${r.trigger === 'end' ? 'closes' : 'finishes'}`;
+  }
+  if (r.kind === 'idle') return `${A} when every session is idle`;
+  return `${A} at <strong>${when(r.at_ts)}</strong>${r.repeat === 'daily' ? ', daily' : r.repeat === 'weekdays' ? ', weekdays' : ''}`;
 };
 
-function render(){
-  const s=ST, t=nowS(), p=s.pending;
-  $('#pEngine').className='pill ok'; $('#pHib').className='pill '+(s.hibernate_enabled===false?'bad':'ok');
-  $('#pHib').lastChild.textContent=s.hibernate_enabled===false?'hibernate off':'hibernate ready';
-  $('#dry').checked=s.settings.dry_run; $('#banner').classList.toggle('on',s.settings.dry_run);
+function setMood(m) { owl.setMood(m); }
 
-  const sessions=s.sessions, armedSid=new Set(s.rules.filter(r=>r.kind==='session'&&r.enabled!==false).map(r=>r.session_id));
-  put('#sessions',JSON.stringify(sessions.map(x=>[x.id,x.state,x.last_prompt,x.last_event|0,!!x.discovered,x.conv]))+[...armedSid],
-    sessions.length?sessions.map(x=>`
-      <div class="item ${x.state==='ended'?'off':''}">
-        <span class="dot ${x.state}"></span>
-        <div style="min-width:0"><div class="t">${esc(x.label||x.conv||x.name)}${armedSid.has(x.id)?'<span class="tag">armed</span>':''}${x.discovered?'<span class="tag" style="color:var(--mute);background:var(--raise)" title="Opened before the hooks existed. Tracked by watching its transcript file; restart it for exact tracking.">watching file</span>':''}</div>
-          <div class="s">${esc(x.name)} · ${esc(x.last_prompt||x.title||'no prompt seen yet')}</div></div>
-        <div style="text-align:right"><div class="m">${x.state} <span data-ago="${x.last_event}"></span></div>
-          ${x.state!=='ended'?`<button class="btn sm" style="margin-top:6px" data-act="arm" data-id="${esc(x.id)}">Arm</button>`:''}</div>
-      </div>`).join(''):
-    `<div class="empty"><b>No sessions seen yet.</b> The hooks report a session the next time you send a prompt in Claude Code. Open a session and it shows up here within a second.</div>`);
+/* 3D mascot. Always on, no setting. Falls back to the flat owl only if WebGL is unavailable. */
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const owl = {
+  ready: false, mood: 'idle', mats: {}, eyes: [], pupils: [], group: null, three: null, raf: 0, visible: true,
+  pointer: {x: 0, y: 0, tx: 0, ty: 0},
+  palette(dark) {
+    return dark ? {body: 0x2d3d52, eye: 0xf4f1ea, pupil: 0x0c1118, beak: 0xf0bd62}
+                : {body: 0x1b2430, eye: 0xf4f1ea, pupil: 0x1b2430, beak: 0xe0a84a};
+  },
+  setMood(m) {
+    this.mood = m;
+    $('#heroOwl').setAttribute('class', 'owl owl-big ' + m);
+    this.draw();
+  },
+  recolor(dark) {
+    if (!this.ready) return;
+    const c = this.palette(dark);
+    this.mats.body.color.set(c.body); this.mats.wing.color.set(c.body);
+    this.mats.belly.color.set(c.eye); this.mats.eye.color.set(c.eye);
+    this.mats.pupil.color.set(c.pupil); this.mats.beak.color.set(c.beak);
+    this.draw();
+  },
+  draw() { if (this.ready) { const {r, scene, cam} = this.three; r.render(scene, cam); } },
+  loop() {
+    if (this.raf || !this.visible) return;
+    const calm = reduceMotion.matches ? 0.3 : 1;
+    const step = now => {
+      this.raf = 0;
+      if (!this.visible) return;
+      const t = now / 1000, g = this.group, mood = this.mood;
+      const speed = mood === 'alert' ? 7 : mood === 'working' ? 3 : 1.6;
+      const amp = (mood === 'alert' ? 0.05 : mood === 'working' ? 0.06 : 0.04) * calm;
+      this.pointer.x += (this.pointer.tx - this.pointer.x) * 0.08;
+      this.pointer.y += (this.pointer.ty - this.pointer.y) * 0.08;
+      g.position.y = Math.sin(t * speed) * amp;
+      g.rotation.y = this.pointer.x * 0.45 + (mood === 'working' ? Math.sin(t * 0.9) * 0.12 * calm : 0);
+      g.rotation.x = this.pointer.y * 0.22;
+      g.rotation.z = mood === 'alert' ? Math.sin(t * 18) * 0.07 * calm : 0;
+      const lookX = mood === 'working' ? Math.sin(t * 1.4) * 0.07 * calm
+                                       : Math.max(-0.07, Math.min(0.07, this.pointer.x * 0.1));
+      const lookY = Math.max(-0.05, Math.min(0.05, this.pointer.y * -0.08));
+      this.pupils.forEach(p => { p.position.x = lookX; p.position.y = lookY; });
+      const phase = t % 4.4;
+      const blink = phase > 4.2 && phase < 4.32 ? 0.12 : 1;
+      this.eyes.forEach(e => { e.scale.y += (blink - e.scale.y) * 0.5; });
+      this.draw();
+      this.raf = requestAnimationFrame(step);
+    };
+    this.raf = requestAnimationFrame(step);
+  },
+  init() {
+    if (!window.THREE) return;  // no library: the flat owl stays visible
+    try {
+      const T = THREE, stage = $('#stage');
+      const r = new T.WebGLRenderer({alpha: true, antialias: true});
+      r.setPixelRatio(Math.min(devicePixelRatio, 2));
+      r.setSize(156, 156, false);
+      stage.prepend(r.domElement);
+      stage.classList.add('has3d');
+      const scene = new T.Scene();
+      const cam = new T.PerspectiveCamera(28, 1, 0.1, 50);
+      cam.position.set(0, 0.15, 7.2);
+      scene.add(new T.AmbientLight(0xffffff, 0.62));
+      const key = new T.DirectionalLight(0xffffff, 0.95); key.position.set(3, 4, 5); scene.add(key);
+      const fill = new T.DirectionalLight(0xc9d6ea, 0.35); fill.position.set(-4, 1, 3); scene.add(fill);
 
-  const live=sessions.filter(x=>x.state!=='ended'), sel=$('#sess'), prev=sel.value;
-  const optSig=JSON.stringify(live.map(x=>[x.id,x.state,x.name]));
-  if(sigs.opts!==optSig){
-    sigs.opts=optSig;
-    sel.innerHTML=live.length?live.map(x=>`<option value="${esc(x.id)}">${esc(x.label||x.conv||x.name)} (${x.state})</option>`).join(''):'<option value="">No live sessions yet</option>';
-    if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
+      const c = this.palette(document.documentElement.dataset.theme === 'dark');
+      const m = {
+        body: new T.MeshStandardMaterial({color: c.body, roughness: 0.55, metalness: 0.02}),
+        wing: new T.MeshStandardMaterial({color: c.body, roughness: 0.6}),
+        belly: new T.MeshStandardMaterial({color: c.eye, roughness: 0.4}),
+        eye: new T.MeshStandardMaterial({color: c.eye, roughness: 0.3}),
+        pupil: new T.MeshStandardMaterial({color: c.pupil, roughness: 0.25}),
+        beak: new T.MeshStandardMaterial({color: c.beak, roughness: 0.35}),
+        shine: new T.MeshStandardMaterial({color: 0xffffff, roughness: 0.15, emissive: 0x222222})
+      };
+      const g = new T.Group();
+      const add = (geo, mat, p = [0, 0, 0], s = [1, 1, 1], rot = [0, 0, 0], parent = g) => {
+        const mesh = new T.Mesh(geo, mat);
+        mesh.position.set(...p); mesh.scale.set(...s); mesh.rotation.set(...rot);
+        parent.add(mesh); return mesh;
+      };
+      const sphere = (rad, w = 48, h = 32) => new T.SphereGeometry(rad, w, h);
+
+      add(sphere(1, 64, 48), m.body, [0, 0, 0], [1, 1.08, 0.95]);                                  // head and body
+      add(sphere(1, 32, 24), m.wing, [-1.02, -0.12, 0], [0.36, 0.95, 0.5], [0, 0, 0.22]);           // wings
+      add(sphere(1, 32, 24), m.wing, [1.02, -0.12, 0], [0.36, 0.95, 0.5], [0, 0, -0.22]);
+      add(new T.ConeGeometry(0.2, 0.62, 24), m.body, [-0.46, 1.04, 0.05], [1, 1, 1], [0, 0, 0.36]); // ear tufts
+      add(new T.ConeGeometry(0.2, 0.62, 24), m.body, [0.46, 1.04, 0.05], [1, 1, 1], [0, 0, -0.36]);
+      add(sphere(1, 40, 28), m.belly, [0, -0.42, 0.8], [0.55, 0.42, 0.2]);                         // belly
+      add(new T.BoxGeometry(0.44, 0.075, 0.05), m.belly, [-0.12, -0.66, 0.9], [1, 1, 1], [0, 0, -0.5]); // chevron
+      add(new T.BoxGeometry(0.44, 0.075, 0.05), m.belly, [0.12, -0.66, 0.9], [1, 1, 1], [0, 0, 0.5]);
+      add(new T.ConeGeometry(0.13, 0.3, 24), m.beak, [0, -0.04, 1.02], [1, 1, 1], [Math.PI / 2, 0, 0]); // beak
+      add(sphere(1, 24, 16), m.body, [-0.36, -1.04, 0.2], [0.2, 0.12, 0.26]);                      // feet
+      add(sphere(1, 24, 16), m.body, [0.36, -1.04, 0.2], [0.2, 0.12, 0.26]);
+
+      const eyes = [], pupils = [];
+      [-0.37, 0.37].forEach(x => {
+        const eg = new T.Group(); eg.position.set(x, 0.22, 0.86); g.add(eg);
+        add(new T.CylinderGeometry(0.42, 0.42, 0.1, 48), m.eye, [0, 0, 0.02], [1, 1, 1], [Math.PI / 2, 0, 0], eg);
+        pupils.push(add(sphere(0.2, 32, 24), m.pupil, [0, 0, 0.1], [1, 1, 0.9], [0, 0, 0], eg));
+        add(sphere(0.055, 16, 12), m.shine, [0.07, 0.07, 0.24], [1, 1, 1], [0, 0, 0], eg);
+        eyes.push(eg);
+      });
+      scene.add(g);
+
+      Object.assign(this, {ready: true, three: {r, scene, cam}, mats: m, group: g, eyes, pupils});
+      const size = () => { const w = stage.clientWidth || 156; r.setSize(w, w, false); };
+      new ResizeObserver(size).observe(stage);
+      addEventListener('pointermove', e => {
+        const rect = stage.getBoundingClientRect();
+        this.pointer.tx = Math.max(-1, Math.min(1, (e.clientX - (rect.left + rect.width / 2)) / 420));
+        this.pointer.ty = Math.max(-1, Math.min(1, (e.clientY - (rect.top + rect.height / 2)) / 420));
+      });
+      new IntersectionObserver(es => { this.visible = es[0].isIntersecting; if (this.visible) this.loop(); }).observe(stage);
+      this.draw(); this.loop();
+    } catch (err) {
+      console.warn('3D mascot unavailable, showing the flat owl', err);
+    }
+  }
+};
+
+
+function render() {
+  const s = ST, p = s.pending;
+  const eng = $('#pEngine'); eng.className = 'chip ok'; eng.querySelector('span').textContent = 'engine running';
+  const hib = $('#pHib');
+  hib.className = 'chip ' + (s.hibernate_enabled === false ? 'warn' : 'ok');
+  hib.querySelector('span').textContent = s.hibernate_enabled === false ? 'hibernate off' : 'hibernate ready';
+  $('#dry').checked = s.settings.dry_run;
+  $('#notify').checked = s.settings.notify !== false;
+  $('#banner').classList.toggle('on', s.settings.dry_run);
+  ddSource.select(s.settings.source, false);
+  $('#srcHelp').textContent = s.settings.source === 'claude-code'
+    ? 'Tracking Claude Code sessions through its hooks and transcript files.'
+    : 'Not tracked yet. Claude Code is the only app that works today.';
+
+  const armed = new Set(s.rules.filter(r => r.kind === 'session' && r.enabled !== false).map(r => r.session_id));
+  put('#sessions', JSON.stringify([s.sessions.map(x => [x.id, x.state, x.label, x.last_prompt, Math.round(x.last_event)]), [...armed]]),
+    s.sessions.length
+      ? s.sessions.map(x => `
+        <div class="item fade ${x.state === 'ended' ? 'off' : ''}">
+          <span class="dot ${x.state}"></span>
+          <div style="min-width:0">
+            <div class="t">${esc(x.label)}${armed.has(x.id) ? '<span class="tag amber">armed</span>' : ''}${x.discovered ? '<span class="tag" title="Found from its transcript file. Restart the session for exact tracking.">file</span>' : ''}</div>
+            <div class="s">${esc(x.last_prompt || x.title || 'No prompt seen yet')}</div>
+          </div>
+          <div class="meta">
+            <span class="state">${esc(x.state)}${x.subagents_running ? ' · ' + x.subagents_running + (x.subagents_running > 1 ? ' agents' : ' agent') : ''}</span>${ago(x.last_event)}
+            ${x.state !== 'ended' ? `<div style="margin-top:6px"><button class="btn sm" data-act="arm" data-id="${esc(x.id)}">Arm</button></div>` : ''}
+          </div>
+        </div>`).join('')
+      : `<div class="empty"><b>No sessions yet</b>Send a prompt in Claude Code and it appears here within a second. Sessions you opened before this tool was installed show up from their transcript files.</div>`);
+
+  const live = s.sessions.filter(x => x.state !== 'ended');
+  const sig = JSON.stringify(live.map(x => [x.id, x.label]));
+  if (sigs.opts !== sig) {
+    sigs.opts = sig;
+    const keep = live.some(x => x.id === form.session) ? form.session : (live[0] ? live[0].id : null);
+    ddSess.set(live.map(x => ({value: x.id, label: x.label})), keep);
+    form.session = ddSess.value;
   }
 
-  put('#rules',JSON.stringify([s.rules,sessions.map(x=>x.conv)]),
-    s.rules.length?s.rules.map(r=>`
-      <div class="item ${r.enabled===false?'off':''}">
-        <span class="dot ${r.enabled===false?'ended':'idle'}"></span>
-        <div style="min-width:0"><div class="t" style="white-space:normal">${ruleText(r)}</div>
-          <div class="s">${r.grace?r.grace+'s warning':'no warning'}${r.kind==='time'?' · <span data-until="'+r.at_ts+'"></span>':''}</div></div>
-        <div class="row" style="gap:6px"><button class="btn sm" data-act="tog" data-id="${r.id}">${r.enabled===false?'Enable':'Pause'}</button><button class="btn sm" data-act="del" data-id="${r.id}">Remove</button></div>
-      </div>`).join(''):
-    `<div class="empty"><b>Nothing armed.</b> Pick a session or a time on the left and arm a rule. It fires once, then clears itself, except repeating clock rules.</div>`);
+  put('#rules', JSON.stringify([s.rules, s.sessions.map(x => x.label)]),
+    s.rules.length
+      ? s.rules.map(r => `
+        <div class="item fade ${r.enabled === false ? 'off' : ''}">
+          <span class="dot ${r.enabled === false ? 'ended' : 'idle'}"></span>
+          <div style="min-width:0">
+            <div class="t" style="white-space:normal">${ruleText(r)}</div>
+            <div class="s">${r.grace ? r.grace + 's warning' : 'No warning'}${r.kind === 'time' ? ' · in <span data-until="' + r.at_ts + '"></span>' : ''}</div>
+          </div>
+          <div class="row" style="gap:6px;flex:none">
+            <button class="btn sm" data-act="tog" data-id="${r.id}">${r.enabled === false ? 'Resume' : 'Pause'}</button>
+            <button class="btn sm" data-act="del" data-id="${r.id}">Remove</button>
+          </div>
+        </div>`).join('')
+      : `<div class="empty"><b>Nothing armed</b>Choose a session or a time, then arm a rule. One-off rules clear themselves after they run.</div>`);
 
-  put('#log',JSON.stringify(s.log.map(x=>x.t)),s.log.length?s.log.map(x=>`<div><time>${hms(x.t)}</time><span>${esc(x.msg)}</span></div>`).join(''):'<div><time></time><span>Quiet so far.</span></div>');
+  put('#log', JSON.stringify(s.log.map(x => x.t)),
+    s.log.length ? s.log.map(x => `<div><time>${hms(x.t)}</time><span>${esc(x.msg)}</span></div>`).join('')
+                 : '<div><span>Nothing yet.</span></div>');
 
-  /* hero */
-  const ring=$('#ring');
-  if(p){
-    ring.classList.remove('idle');
-    $('#hTitle').textContent=`${VERB[p.action]} incoming`;
-    $('#hSub').innerHTML=`Triggered because <span class="why">${esc(p.reason)}</span>.`+(p.cancel_on_activity?' Sending a new prompt cancels it and re-arms the rule.':'');
-    put('#hActs','cancel','<button class="btn primary" data-act="cancel">Cancel</button>');
-  }else{
-    ring.classList.add('idle'); $('#rNum').textContent='idle'; $('#rLbl').textContent=''; $('#prog').style.strokeDashoffset=603.2;
-    const act=s.rules.filter(r=>r.enabled!==false), times=act.filter(r=>r.kind==='time').sort((a,b)=>a.at_ts-b.at_ts);
-    $('#hTitle').textContent='Standing by';
-    $('#hSub').textContent=act.length?`${act.length} rule${act.length>1?'s':''} armed`+(times[0]?`. Next clock event: ${VERB[times[0].action].toLowerCase()} in ${dur(times[0].at_ts-t)}.`:'.'):'Nothing armed. Your laptop stays on until you say otherwise.';
-    put('#hActs','none','');
+  const working = s.sessions.some(x => x.state === 'working');
+  const armedAny = s.rules.some(r => r.enabled !== false);
+  if (p) {
+    setMood('owl alert');
+    $('#hTitle').textContent = `${VERB[p.action]} in progress`;
+    $('#hSub').textContent = p.cancel_on_activity
+      ? 'Send a new prompt in that session to cancel and re-arm the rule.'
+      : 'Cancel now if you still need the machine.';
+    $('#cd').classList.add('on');
+    $('#cdAction').textContent = VERB[p.action];
+    $('#cdReason').textContent = p.reason;
+    put('#hActs', 'cancel', '<button class="btn amber" data-act="cancel">Cancel</button>');
+  } else {
+    setMood(working ? 'owl working' : 'owl idle');
+    $('#cd').classList.remove('on');
+    put('#hActs', 'none', '');
+    const next = s.rules.filter(r => r.enabled !== false && r.kind === 'time').sort((a, b) => a.at_ts - b.at_ts)[0];
+    $('#hTitle').textContent = working ? 'Claude is working' : 'Standing by';
+    if (!armedAny) $('#hSub').textContent = 'Nothing is armed. Your laptop stays on until you say otherwise.';
+    else if (next) $('#hSub').innerHTML = `Keeping this laptop awake until a rule fires. Next: <strong>${VERB[next.action].toLowerCase()}</strong> at ${when(next.at_ts)}.`;
+    else $('#hSub').innerHTML = 'Keeping this laptop awake until a rule fires.';
   }
   tick();
 }
 
-/* 4x/sec: live numbers without re-rendering */
-function tick(){
-  if(!ST) return; const t=nowS(), p=ST.pending;
-  $('#clock').textContent=new Date().toLocaleTimeString([],{hour12:false});
-  if(p){
-    const left=Math.max(0,p.fires_at-t);
-    $('#rNum').textContent=Math.ceil(left); $('#rLbl').textContent=p.action;
-    $('#prog').style.strokeDashoffset=603.2*(p.grace?1-left/p.grace:1);
+function tick() {
+  if (!ST) return;
+  const t = nowS(), p = ST.pending;
+  if (p) {
+    const left = Math.max(0, p.fires_at - t);
+    $('#rNum').textContent = Math.ceil(left);
+    $('#prog').style.strokeDasharray = RING;
+    $('#prog').style.strokeDashoffset = RING * (p.grace ? 1 - left / p.grace : 1);
   }
-  $$('[data-ago]').forEach(e=>e.textContent=ago(+e.dataset.ago));
-  $$('[data-until]').forEach(e=>e.textContent='in '+dur(+e.dataset.until-t));
+  $$('[data-until]').forEach(e => {
+    const s = Math.max(0, +e.dataset.until - t);
+    e.textContent = s < 3600 ? Math.floor(s / 60) + 'm ' + String(Math.floor(s % 60)).padStart(2, '0') + 's' : Math.floor(s / 3600) + 'h ' + Math.floor(s % 3600 / 60) + 'm';
+  });
 }
 
-async function poll(){
-  try{ const j=await api('/api/state'); off=j.now-Date.now()/1000; ST=j; render(); }
-  catch(e){
-    $('#pEngine').className='pill bad'; ST=null;
-    $('#hTitle').textContent='Engine offline';
-    $('#hSub').textContent='The background engine is not answering. Send any prompt in Claude Code to relaunch it, or double-click start-hub.vbs in the hibernate-hub folder. This page reconnects by itself.';
-    sigs['#hActs']=null;
+async function poll() {
+  try {
+    const j = await api('/api/state');
+    off = j.now - Date.now() / 1000;
+    ST = j; render();
+  } catch (e) {
+    $('#pEngine').className = 'chip warn';
+    $('#pEngine').querySelector('span').textContent = 'engine offline';
+    ST = null;
+    setMood('owl idle');
+    $('#hTitle').textContent = 'Engine offline';
+    $('#hSub').textContent = 'The background engine is not answering. Send a prompt in Claude Code to start it, or double-click start-hub.vbs in the hibernate-hub folder. This page reconnects by itself.';
+    $('#cd').classList.remove('on');
+    put('#hActs', 'none', '');
   }
 }
-applyKind(); poll(); setInterval(poll,1500); setInterval(tick,250);
+
+/* start */
+const OWL = `
+  <g class="body">
+    <ellipse class="ink" cx="44" cy="162" rx="20" ry="38" transform="rotate(-18 44 162)"/>
+    <ellipse class="ink" cx="212" cy="162" rx="20" ry="38" transform="rotate(18 212 162)"/>
+    <path class="ink" d="M68 78 C58 54 62 30 82 20 C94 34 98 56 96 78 C87 70 76 70 68 78 Z"/>
+    <path class="ink" d="M188 78 C198 54 194 30 174 20 C162 34 158 56 160 78 C169 70 180 70 188 78 Z"/>
+    <circle class="ink" cx="128" cy="146" r="88"/>
+    <ellipse class="ink" cx="104" cy="226" rx="13" ry="17"/>
+    <ellipse class="ink" cx="152" cy="226" rx="13" ry="17"/>
+    <path class="stroke" d="M112 196 L128 212 L144 196"/>
+  </g>
+  <g class="eyes">
+    <circle class="cream" cx="96" cy="128" r="31"/><circle class="cream" cx="160" cy="128" r="31"/>
+    <circle class="ink" cx="99" cy="131" r="14"/><circle class="ink" cx="157" cy="131" r="14"/>
+    <circle class="cream" cx="94" cy="125" r="4.5"/><circle class="cream" cx="152" cy="125" r="4.5"/>
+  </g>
+  <path class="ink" d="M128 150 L116 170 Q128 180 140 170 Z"/>`;
+$('#brandOwl').innerHTML = OWL;
+$('#heroOwl').innerHTML = OWL;
+applyTheme(themeMode());
+applyKind();
+owl.init();
+poll();
+setInterval(poll, 1500);
+setInterval(tick, 250);
 </script>
 </body>
 </html>

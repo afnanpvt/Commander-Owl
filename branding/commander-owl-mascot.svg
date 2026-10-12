@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <title>Commander Owl</title>
+  <!-- wings -->
+  <ellipse cx="44" cy="162" rx="20" ry="38" transform="rotate(-18 44 162)" fill="#000"/>
+  <ellipse cx="212" cy="162" rx="20" ry="38" transform="rotate(18 212 162)" fill="#000"/>
+  <!-- ear tufts: soft rounded feather, blunt tip -->
+  <path d="M68 78 C58 54 62 30 82 20 C94 34 98 56 96 78 C87 70 76 70 68 78 Z" fill="#000"/>
+  <path d="M188 78 C198 54 194 30 174 20 C162 34 158 56 160 78 C169 70 180 70 188 78 Z" fill="#000"/>
+  <!-- body/head -->
+  <circle cx="128" cy="146" r="88" fill="#000"/>
+  <!-- feet -->
+  <ellipse cx="104" cy="226" rx="13" ry="17" fill="#000"/>
+  <ellipse cx="152" cy="226" rx="13" ry="17" fill="#000"/>
+  <!-- eyes -->
+  <circle cx="96" cy="128" r="31" fill="#fff"/>
+  <circle cx="160" cy="128" r="31" fill="#fff"/>
+  <circle cx="99" cy="131" r="14" fill="#000"/>
+  <circle cx="157" cy="131" r="14" fill="#000"/>
+  <circle cx="94" cy="125" r="4.5" fill="#fff"/>
+  <circle cx="152" cy="125" r="4.5" fill="#fff"/>
+  <!-- beak -->
+  <path d="M128 150 L116 170 Q128 180 140 170 Z" fill="#000"/>
+  <!-- small chest accent: power chevron, not a plain belly patch -->
+  <path d="M112 196 L128 212 L144 196" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="128" cy="196" r="4.5" fill="#fff"/>
+</svg>
