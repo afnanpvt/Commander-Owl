@@ -1,9 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <path d="M128 40 L92 56 L70 46 L72 84 C50 110 48 160 64 196 C80 226 104 232 128 232 C152 232 176 226 192 196 C208 160 206 110 184 84 L186 46 L164 56 Z" fill="none" stroke="#000" stroke-width="12" stroke-linejoin="round"/>
-  <g fill="none" stroke="#000" stroke-width="10" stroke-linecap="round">
-    <circle cx="100" cy="124" r="20" stroke-dasharray="83.7 42" transform="rotate(0 100 124)"/>
-    <circle cx="156" cy="124" r="20" stroke-dasharray="83.7 42"/>
-    <path d="M100 118 V94 M156 118 V94"/>
+  <title>Commander Owl</title>
+  <rect x="6" y="6" width="244" height="244" rx="56" fill="#f4f1ea" stroke="#1b2430" stroke-width="10"/>
+  <g transform="translate(128 128) scale(0.74) translate(-128 -140)">
+  <path fill-rule="evenodd" fill="#1b2430" d="M66 46 Q96 54 104 66 Q128 56 152 66 Q160 54 190 46 Q200 68 200 92 C222 114 224 178 192 210 C168 232 148 236 128 236 C108 236 88 232 64 210 C32 178 34 114 56 92 Q54 68 66 46 Z
+    M108 99.75 A28 28 0 1 1 80 99.75 L86 110.14 A16 16 0 1 0 102 110.14 Z
+    M176 99.75 A28 28 0 1 1 148 99.75 L154 110.14 A16 16 0 1 0 170 110.14 Z
+    M90 90 h8 v30 h-8 Z M158 90 h8 v30 h-8 Z
+    M128 150 L119 166 Q128 174 137 166 Z
+    M112 74 L128 86 L144 74 L144 82 L128 94 L112 82 Z"/>
   </g>
-  <path d="M128 146 L120 164 L136 164 Z" fill="#000"/>
 </svg>

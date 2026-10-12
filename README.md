@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/dashboard.png" width="860" alt="Commander Owl dashboard">
+  <img src="docs/dashboard-framed.png" width="860" alt="Commander Owl dashboard">
 </p>
 
 Commander Owl is a small local dashboard for Windows. It lists your Claude Code sessions, shows which ones are working, and lets you arm a rule such as "hibernate when this conversation finishes", "shut down when every session is idle" or "sleep at 23:30 on weekdays". While a rule is armed, the laptop stays awake, so Windows' own sleep timer cannot cut a long run short. Only your rule powers the machine off.
