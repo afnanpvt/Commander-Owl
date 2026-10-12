@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="branding/commander-owl.svg" width="120" alt="Commander Owl logo">
+  <img src="docs/mascot-framed.png" width="150" alt="Commander Owl mascot">
 </p>
 
 <h1 align="center">Commander Owl</h1>
